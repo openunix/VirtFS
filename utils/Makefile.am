@@ -1,7 +1,8 @@
-AM_CPPFLAGS = $(GF_CPPFLAGS) -I$(top_builddir)/lib -I$(top_srcdir)/lib
-LDADD = $(top_builddir)/lib/libgnu.a
+AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lib
+LDADD = $(top_builddir)/lib/libutils.a $(top_builddir)/lib/libvirtfs.a
 
 all-local:
+	mkdir -p $(top_builddir)/build/bin
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfcat
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfcp
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfls
@@ -15,10 +16,11 @@ all-local:
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfclear
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfmv
 
-bin_PROGRAMS = 	$(top_builddir)/build/bin/gfcli \
-		$(top_builddir)/build/bin/gfput
+bin_PROGRAMS = virtfs-cli
+#		$(top_builddir)/build/bin/gfput
 
-EXTRA_DIST = glfs-cat.h \
+virtfs_cli_SOURCES = glfs-cli.c glfs-cli-commands.c\
+         glfs-cat.h \
 	     glfs-cp.h \
 	     glfs-cli-commands.h \
 	     glfs-cli.h \

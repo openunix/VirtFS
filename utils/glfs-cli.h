@@ -19,21 +19,19 @@
 #ifndef GLFS_CLI_H
 #define GLFS_CLI_H
 
-#include "glfs-util.h"
-
-#include <glusterfs/api/glfs.h>
+#include <virtfs.h>
 #include <stdbool.h>
 
 struct fd_list {
         struct fd_list *next;
-        glfs_fd_t *fd;
+        virtfs_fd_t *fd;
         char *path;
 };
 
 struct cli_context {
-        glfs_t *fs;
+        virtfs_t *fs;
         struct fd_list *flist;
-        struct gluster_url *url;
+        char *url;
         struct options *options;
         char *conn_str;
         int argc;
@@ -45,5 +43,13 @@ struct options {
         struct xlator_option *xlator_options;
         bool debug;
 };
+
+#define COPYRIGHT \
+"Based on glusterfs-coreutils:\n" \
+"  Copyright (C) 2015 Facebook, Inc."
+#define LICENSE \
+"  License GPLv3: GNU GPL version 3 <http://www.gnu.org/licenses/gpl-3.0.en.html>.\n" \
+"  This is free software: you are free to change and redistribute it.\n" \
+"  There is NO WARRANTY, to the extent permitted by law."
 
 #endif

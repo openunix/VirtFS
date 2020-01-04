@@ -47,7 +47,6 @@
 #include "glfs-rm.h"
 #include "glfs-stat.h"
 #include "glfs-tail.h"
-#include "glfs-util.h"
 #include "glfs-rmdir.h"
 #include "glfs-mv.h"
 
@@ -91,13 +90,18 @@ static struct cmd const cmds[] =
 {
         { .name = "connect", .execute = cli_connect },
         { .name = "disconnect", .execute = cli_disconnect },
+#if 0
         { .alias = "gfcat", .name = "cat", .execute = do_cat },
         { .alias = "gfcp", .name = "cp", .execute = do_cp },
+#endif
         { .name = "help", .execute = shell_usage },
+#if 0
         { .alias = "gfls", .name = "ls", .execute = do_ls },
         { .alias = "gfmkdir", .name = "mkdir", .execute = do_mkdir },
         { .alias = "gftouch", .name = "touch", .execute = do_touch },
+#endif
         { .name = "quit", .execute = handle_quit },
+#if 0
         { .alias = "gfrm", .name = "rm", .execute = do_rm },
         { .alias = "gfstat", .name = "stat", .execute = do_stat },
         { .alias = "gftail", .name = "tail", .execute = do_tail },
@@ -107,6 +111,7 @@ static struct cmd const cmds[] =
         { .name = "clear", .execute = do_clear },
         { .name = "flock", .execute = do_flock },
         { .alias = "gfmv", .name = "mv", .execute = do_mv }
+#endif
 };
 #define NUM_CMDS sizeof cmds / sizeof cmds[0]
 
@@ -180,18 +185,18 @@ start_shell ()
 
         while (true) {
                 if (ctx->conn_str) {
-                        size = sizeof (char) * (9 + strlen (ctx->conn_str));
+                        size = sizeof (char) * (10 + strlen (ctx->conn_str));
                         prompt = malloc (size);
 
                         ret = snprintf (prompt,
                                         size,
-                                        "gfcli %s> ",
+                                        "virtfs %s> ",
                                         ctx->conn_str);
 
                 } else {
-                        prompt = malloc (sizeof (char) * 8);
+                        prompt = malloc (sizeof (char) * 9);
 
-                        ret = sprintf(prompt, "gfcli> ");
+                        ret = sprintf(prompt, "virtfs> ");
                 }
 
                 if (ret == -1 || prompt == NULL) {
@@ -245,8 +250,7 @@ static struct option const long_options[] =
 {
         {"debug", no_argument, NULL, 'd'},
         {"help", no_argument, NULL, 'h'},
-        {"version", no_argument, NULL, 'v'},
-        {"xlator-option", required_argument, NULL, 'o'},
+        {"version", no_argument, NULL, 'V'},
         {NULL, no_argument, NULL, 0}
 };
 
@@ -254,19 +258,12 @@ static void
 usage ()
 {
         printf ("Usage: %s [OPTION]... [URL]\n"
-                "Start a Gluster shell to execute commands on a remote Gluster volume.\n\n"
-                "  -o, --xlator-option=OPTION   specify a translator option for the\n"
-                "                               connection. Multiple options are supported\n"
-                "                               and take the form xlator.key=value.\n"
-                "  -p, --port=PORT              specify a port on which to connect\n"
-                "      --help     display this help and exit\n"
-                "      --version  output version information and exit\n\n"
-                "Examples:\n"
-                "  gfcli glfs://localhost/groot\n"
-                "        Start a shell with a connection to localhost opened.\n"
-                "  gfcli -o *replicate*.data-self-heal=on glfs://localhost/groot\n"
-                "        Start a shell with a connection localhost open, with the\n"
-                "        translator option data-self-head set to on.\n",
+"Start an VirtFS shell to execute commands without mounting filesystem.\n"
+"Options:\n"
+"    -h   --help            display this help and exit\n"
+"    -V   --version         output version information and exit\n"
+"    -d   --debug           enable debug output\n"
+"    -o options             Additional options for the file system\n",
                 program_invocation_name);
         exit (EXIT_SUCCESS);
 }
@@ -285,7 +282,7 @@ parse_options (struct cli_context *ctx)
         opterr = 0;
 
         while (true) {
-                opt = getopt_long (argc, argv, "ho:", long_options,
+                opt = getopt_long (argc, argv, "hVd", long_options,
                                 &option_index);
 
                 if (opt == -1) {
@@ -296,6 +293,7 @@ parse_options (struct cli_context *ctx)
                         case 'd':
                                 ctx->options->debug = true;
                                 break;
+#if 0
                         case 'o':
                                 option = parse_xlator_option (optarg);
                                 if (option == NULL) {
@@ -307,11 +305,12 @@ parse_options (struct cli_context *ctx)
                                 }
 
                                 break;
+#endif
                         case 'h':
                                 usage ();
                                 exit (EXIT_SUCCESS);
-                        case 'v':
-                                printf ("%s (%s) %s\n%s\n%s\n%s\n",
+                        case 'V':
+                                printf ("%s (%s) %s\n\n%s\n%s\n  %s\n",
                                                 program_invocation_name,
                                                 PACKAGE_NAME,
                                                 PACKAGE_VERSION,
@@ -330,10 +329,11 @@ parse_options (struct cli_context *ctx)
                 if (cli_connect (ctx) == -1) {
                         exit (EXIT_FAILURE);
                 }
-
+#if 0
                 if (apply_xlator_options (ctx->fs, &ctx->options->xlator_options) == -1) {
                         exit (EXIT_FAILURE);
                 }
+#endif
         }
 }
 
@@ -343,12 +343,12 @@ cleanup ()
         struct fd_list *cur, *ptr = NULL;
 
         if (ctx->url) {
-                gluster_url_free (ctx->url);
+                free(ctx->url);
                 ctx->url = NULL;
         }
 
         if (ctx->options) {
-                free_xlator_options (&ctx->options->xlator_options);
+                //free_xlator_options (&ctx->options->xlator_options);
                 free (ctx->options);
         }
 
@@ -356,7 +356,7 @@ cleanup ()
         ptr = ctx->flist;
         while (ptr) {
                 if (ptr->fd) {
-                        glfs_close (ptr->fd);
+                        virtfs_close(ptr->fd);
                         ptr->fd = NULL;
                 }
 
@@ -371,7 +371,7 @@ cleanup ()
         }
 
         if (ctx->fs) {
-                glfs_fini (ctx->fs);
+                virtfs_fini(ctx->fs);
                 ctx->fs = NULL;
         }
 
@@ -398,7 +398,7 @@ main (int argc, char *argv[])
         // with buffers not being fully flushed.
         signal (SIGINT, sig_handler);
         program_invocation_name = basename (argv[0]);
-        atexit (close_stdout);
+        //atexit (close_stdout);
 
         ctx = malloc (sizeof (*ctx));
         if (ctx == NULL) {
@@ -438,7 +438,7 @@ main (int argc, char *argv[])
                 ret = start_shell ();
 
                 if (ctx->options->debug) {
-                        print_xlator_options (&ctx->options->xlator_options);
+                        //print_xlator_options (&ctx->options->xlator_options);
                 }
         }
 

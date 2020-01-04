@@ -21,18 +21,17 @@
 #include <errno.h>
 #include <error.h>
 #include <getopt.h>
-#include <glusterfs/api/glfs.h>
+#include <virtfs.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "glfs-cli-commands.h"
 #include "glfs-cli.h"
-#include "glfs-util.h"
 
 static struct option const connect_options[] =
 {
-        {"port", required_argument, NULL, 'p'},
+        //{"port", required_argument, NULL, 'p'},
         {NULL, no_argument, NULL, 0}
 };
 
@@ -44,14 +43,14 @@ cli_connect (struct cli_context *ctx)
         int ret;
         int opt;
         int option_index;
-        struct gluster_url *url = NULL;
-        glfs_t *fs = NULL;
-        uint16_t port = GLUSTER_DEFAULT_PORT;
+        char *url = NULL;
+        virtfs_t *fs = NULL;
         struct xlator_option *xlator_options = NULL;
         struct xlator_option *option;
 
-        while ((opt = getopt_long (argc, argv, "o:p:", connect_options, &option_index)) != -1) {
+        while ((opt = getopt_long(argc, argv, "o:", connect_options, &option_index)) != -1) {
                 switch (opt) {
+#if 0
                         case 'o':
                                 option = parse_xlator_option (optarg);
                                 if (option == NULL) {
@@ -65,41 +64,37 @@ cli_connect (struct cli_context *ctx)
                                 }
 
                                 break;
-                        case 'p':
-                                port = strtoport (optarg);
-                                if (port == 0) {
-                                        goto err;
-                                }
-
-                                break;
+#endif
                         default:
                                 goto err;
                 }
         }
 
-        ret = gluster_parse_url (argv[argc - 1], &url);
+        ret = virtfs_new(argv[argc - 1], &fs);
         if (ret == -1) {
                 printf ("Usage: %s [OPTION]... URL\n"
-                        "Connect to a Gluster volume for this session.\n\n"
-                        "  -o, --xlator-option=OPTION   specify a translator option for the\n"
-                        "                               connection. Multiple options are supported\n"
-                        "                               and take the form xlator.key=value.\n"
-                        "  -p, --port=PORT              specify the port on which to connect\n",
+"Connect to an NFS server for this session.\n"
+"Options:\n"
+"    -o   NFS options, see nfs(5) or fuse-nfs(5)\n",
                         argv[0]);
                 goto err;
         }
 
-        url->port = port;
-
-        ret = gluster_getfs (&fs, url);
-        if (ret == -1) {
-                error (0, errno, "failed to connect to %s/%s", url->host, url->volume);
+        url = strdup(argv[argc - 1]);
+        if (url == NULL) {
+                error(0, errno, "failed to set URL %s", url);
                 goto err;
         }
-
+#if 0
         ret = apply_xlator_options (fs, &xlator_options);
         if (ret == -1) {
                 error (0, errno, "failed to apply translator options");
+                goto err;
+        }
+#endif
+        ret = virtfs_init(fs);
+        if (ret == -1) {
+                error (0, errno, "failed to connect to URL %s", url);
                 goto err;
         }
 
@@ -112,6 +107,7 @@ cli_connect (struct cli_context *ctx)
         ctx->fs = fs;
         ctx->url = url;
 
+#if 0
         // TODO(craigcabrey): Look into using asprintf here.
         // 5 is the length of the string format: (%s/%s)
         size_t length = strlen (ctx->url->host) + strlen (ctx->url->volume) + 5;
@@ -127,12 +123,14 @@ cli_connect (struct cli_context *ctx)
                         "(%s/%s)",
                         ctx->url->host,
                         ctx->url->volume);
+#endif
 
         goto out;
 
 err:
         ret = -1;
-        gluster_url_free (url);
+        if (fs)
+                virtfs_fini(fs);
 out:
         return ret;
 }
@@ -143,13 +141,13 @@ cli_disconnect (struct cli_context *ctx)
         int ret = 0;
         struct fd_list *cur, *ptr = NULL;
 
-        free_xlator_options (&ctx->options->xlator_options);
+        //free_xlator_options (&ctx->options->xlator_options);
 
         /* Traverse fd_list and cleanup each entry.*/
         ptr = ctx->flist;
         while (ptr) {
                 if (ptr->fd) {
-                        glfs_close (ptr->fd);
+                        virtfs_close(ptr->fd);
                         ptr->fd = NULL;
                 }
 
@@ -167,12 +165,12 @@ cli_disconnect (struct cli_context *ctx)
                 // FIXME: Memory leak occurs here in GFS >= 3.6. Test with 3.7
                 // and if fixed, remove the entry (xlator_mem_acct_init) from
                 // the valgrind suppression file.
-                ret = glfs_fini (ctx->fs);
+                ret = virtfs_fini(ctx->fs);
                 ctx->fs = NULL;
         }
 
         if (ctx->url) {
-                gluster_url_free (ctx->url);
+                free(ctx->url);
                 ctx->url = NULL;
         }
 

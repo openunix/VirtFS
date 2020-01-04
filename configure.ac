@@ -22,10 +22,11 @@ AC_PROG_LIBTOOL
 
 # Checks for libraries.
 AC_CHECK_LIB([readline], [readline], [], AC_MSG_ERROR([You need readline to run.]))
+AC_CHECK_LIB([nfs], [nfs_init_context], [], AC_MSG_ERROR([You need libnfs to run.]))
 
 # Checks for header files.
 
-# We won't checks for types because fuse and tirpc will require that.
+AC_CHECK_FUNCS([nfs_umount])
 
 # Checks for structures
 
@@ -39,5 +40,6 @@ AC_SYS_LARGEFILE
 AC_CONFIG_FILES([Makefile
                  include/Makefile
                  lib/Makefile
+                 utils/Makefile
                 ])
 AC_OUTPUT

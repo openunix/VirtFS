@@ -14,8 +14,10 @@
 #include <string.h>
 #include <errno.h>
 
+#include <nfsc/libnfs.h>
+#include <config.h>
 #include <virtfs.h>
-#include <virtfs_log.h>
+#include "virtfs_i.h"
 
 /*
  * Copied from libfuse lib/fuse_opt.c and lib/fuse_log.c
@@ -74,4 +76,95 @@ static int add_opt_common(char **opts, const char *opt, int esc)
 	*d = '\0';
 
 	return 0;
+}
+
+#define VIRTFS_NFS_FLAG_MOUNT 0x0001
+struct virtfs_p
+{
+        int flags;
+        struct nfs_context *nfs;
+        struct nfs_url *url;
+};
+
+int virtfs_new(const char *url, virtfs_t **fs)
+{
+        struct virtfs_p *fsp = NULL;
+        int ret = -1;
+
+        fsp = malloc(sizeof(struct virtfs_p));
+        if (!fsp)
+                return alloc_failed();
+
+        bzero(fsp, sizeof(struct virtfs_p));
+        fsp->nfs = nfs_init_context();
+        if (fsp->nfs == NULL) {
+                ERR("failed to init libnfs context\n");
+                ret = -ENOMEM;
+                goto err;
+        }
+
+        fsp->url = nfs_parse_url_dir(fsp->nfs, url);
+        if (fsp->url == NULL) {
+                ERR("failed to parse NFS URL\n");
+                ret = -EINVAL;
+                goto err2;
+        }
+
+        *fs = (virtfs_t *)fsp;
+        return 0;
+
+err2:
+        nfs_destroy_context(fsp->nfs);
+err:
+        free(fsp);
+        return ret;
+}
+
+int virtfs_init(virtfs_t *fs)
+{
+        struct virtfs_p *fsp;
+        int ret = -EINVAL;
+
+        if (fs == NULL)
+                goto err;
+
+        fsp = (struct virtfs_p *)fs;
+        if (fsp->flags & VIRTFS_NFS_FLAG_MOUNT != 0)
+                goto err;
+
+        ret = nfs_mount(fsp->nfs, fsp->url->server, fsp->url->path);
+        if (ret == 0)
+                fsp->flags |= VIRTFS_NFS_FLAG_MOUNT;
+
+err:
+        return ret;
+}
+
+int virtfs_fini(virtfs_t *fs)
+{
+        struct virtfs_p *fsp;
+        int ret = -EINVAL;
+
+        fsp = (struct virtfs_p *)fs;
+        if (fs == NULL)
+                goto err;
+
+        ret = 0;
+
+#ifdef HAVE_NFS_UMOUNT
+        if (fsp->flags & VIRTFS_NFS_FLAG_MOUNT != 0)
+                ret = nfs_umount(fsp->nfs);
+#endif /* HAVE_NFS_UMOUNT */
+
+        if (fsp->url)
+                nfs_destroy_url(fsp->url);
+        if (fsp->nfs)
+                nfs_destroy_context(fsp->nfs);
+err:
+        return ret;
+}
+
+int virtfs_close(vfd_t vfd)
+{
+        return -ENOTSUP;
 }

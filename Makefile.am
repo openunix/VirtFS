@@ -1,4 +1,4 @@
 EXTRA_DIST = \
     README.md
 
-SUBDIRS = include lib
+SUBDIRS = include lib utils
