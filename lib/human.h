@@ -24,9 +24,9 @@
 # include <stdbool.h>
 # include <stdint.h>
 # include <unistd.h>
-
+#if 0
 # include <xstrtol.h>
-
+#endif
 /* A conservative bound on the maximum length of a human-readable string.
    The output can be the square of the largest uintmax_t, so double
    its size before converting to a bound.

@@ -25,9 +25,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#if 0
 #include <argmatch.h>
 #include <error.h>
+#endif
 #include <intprops.h>
 
 /* The maximum length of a suffix like "KiB".  */
@@ -387,7 +388,7 @@ human_readable (uintmax_t n, char *buf, int opts,
   return p;
 }
 
-
+#if 0
 /* The default block size used for output.  This number may change in
    the future as disks get larger.  */
 #ifndef DEFAULT_BLOCK_SIZE
@@ -468,3 +469,4 @@ human_options (char const *spec, int *opts, uintmax_t *block_size)
     }
   return e;
 }
+#endif
