@@ -93,7 +93,7 @@ cli_connect (struct cli_context *ctx)
         }
 #endif
         ret = virtfs_init(fs);
-        if (ret == -1) {
+        if (ret < 0) {
                 error (0, errno, "failed to connect to URL %s", url);
                 goto err;
         }

@@ -2,6 +2,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lib
 LDADD = $(top_builddir)/lib/libutils.a $(top_builddir)/lib/libvirtfs.a
 
 all-local:
+	$(LN_S) -f virtfs-cli virtfs-stat
 	mkdir -p $(top_builddir)/build/bin
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfcat
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfcp
@@ -9,7 +10,6 @@ all-local:
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfmkdir
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gftouch
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfrm
-	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfstat
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gftail
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gftruncate
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfrmdir
@@ -19,7 +19,8 @@ all-local:
 bin_PROGRAMS = virtfs-cli
 #		$(top_builddir)/build/bin/gfput
 
-virtfs_cli_SOURCES = glfs-cli.c glfs-cli-commands.c\
+virtfs_cli_SOURCES = glfs-cli.c glfs-cli-commands.c glfs-stat.c \
+        glfs-stat-util.c\
          glfs-cat.h \
 	     glfs-cp.h \
 	     glfs-cli-commands.h \

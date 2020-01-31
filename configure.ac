@@ -13,8 +13,9 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_CC_C99
+
 AC_PROG_INSTALL
-AM_PROG_CC_C_O
 
 AC_GNU_SOURCE
 
@@ -29,6 +30,8 @@ AC_CHECK_LIB([nfs], [nfs_init_context], [], AC_MSG_ERROR([You need libnfs to run
 AC_CHECK_FUNCS([nfs_umount])
 
 # Checks for structures
+AC_CHECK_MEMBERS([struct stat.st_atim])
+AC_CHECK_MEMBERS([struct stat.st_atimespec])
 
 # Check for compiler characteristics.
 

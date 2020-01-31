@@ -10,14 +10,12 @@
 #define CLNTLIB_LOGLEVEL LOG_WARNING
 
 #if CLNTLIB_LOGLEVEL >=	LOG_DEBUG
-#  define DEBUG(fmt, args...) syslog(LOG_ERR, fmt, ##args)
 #  if CLNTLIB_LOGLEVEL > LOG_DEBUG
 #	 define DEBUG_V(fmt, args...) syslog(LOG_ERR, fmt, ##args)
 #  else
 #	 define DEBUG_V(fmt, args...) do{}while(0)
 #  endif
 #else
-#  define DEBUG(fmt, args...) do{}while(0)
 #  define DEBUG_V(fmt, args...) do{}while(0)
 #endif
 #if CLNTLIB_LOGLEVEL >= LOG_WARNING
@@ -28,6 +26,7 @@
 
 #define ERR(fmt, args...) virtfs_log(VIRTFS_LOG_ERR, fmt, ##args)
 #define	INFO(fmt, args...) virtfs_log(VIRTFS_LOG_INFO, fmt, ##args)
+#define	DEBUG(fmt, args...) virtfs_log(VIRTFS_LOG_DEBUG, fmt, ##args)
 
 extern int __INIT_DEBUG;
 #define DEBUG_IN(fmt, args...)						\

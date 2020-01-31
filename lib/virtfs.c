@@ -7,15 +7,17 @@
  * later), or the GNU General Public License, version 2 (GPLv2), in
  * all cases as published by the Free Software Foundation.
  */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
-#include <stdarg.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 
 #include <nfsc/libnfs.h>
-#include <config.h>
 #include <virtfs.h>
 #include "virtfs_i.h"
 
@@ -103,8 +105,10 @@ int virtfs_new(const char *url, virtfs_t **fs)
                 goto err;
         }
 
-        fsp->url = nfs_parse_url_dir(fsp->nfs, url);
-        if (fsp->url == NULL) {
+        fsp->url = nfs_parse_url_incomplete(fsp->nfs, url);
+        if (fsp->url == NULL ||
+            fsp->url->server == NULL ||
+            fsp->url->path == NULL) {
                 ERR("failed to parse NFS URL\n");
                 ret = -EINVAL;
                 goto err2;
@@ -152,7 +156,7 @@ int virtfs_fini(virtfs_t *fs)
         ret = 0;
 
 #ifdef HAVE_NFS_UMOUNT
-        if (fsp->flags & VIRTFS_NFS_FLAG_MOUNT != 0)
+        if ((fsp->flags & VIRTFS_NFS_FLAG_MOUNT) != 0)
                 ret = nfs_umount(fsp->nfs);
 #endif /* HAVE_NFS_UMOUNT */
 
@@ -167,4 +171,77 @@ err:
 int virtfs_close(vfd_t vfd)
 {
         return -ENOTSUP;
+}
+
+#define __COPY_ATTR(x) buf->st_##x = buf64.nfs_##x
+#define __COPY_ATTR2(x, y) buf->x = buf64.y
+static int _do_nfs_stat(virtfs_t *fs, const char *path, struct stat *buf,
+        int (*f)(struct nfs_context *, const char *, struct nfs_stat_64 *))
+{
+        struct nfs_stat_64 buf64;
+        struct virtfs_p *fsp;
+        int ret = -EINVAL;
+
+        fsp = (struct virtfs_p *)fs;
+        if (fs == NULL)
+                goto err;
+
+        if (path)
+                ret = f(fsp->nfs, path, &buf64);
+        else if (fsp->url->file)
+                ret = f(fsp->nfs, fsp->url->file, &buf64);
+        else
+                ret = f(fsp->nfs, "/", &buf64);
+
+        __COPY_ATTR(dev);
+        __COPY_ATTR(ino);
+        __COPY_ATTR(mode);
+        __COPY_ATTR(nlink);
+        __COPY_ATTR(uid);
+        __COPY_ATTR(gid);
+        __COPY_ATTR(rdev);
+        __COPY_ATTR(size);
+        __COPY_ATTR(blksize);
+        __COPY_ATTR(blocks);
+        __COPY_ATTR(atime);
+        __COPY_ATTR(mtime);
+        __COPY_ATTR(ctime);
+#ifdef HAVE_STRUCT_STAT_ST_ATIM
+        __COPY_ATTR2(st_atim.tv_nsec, nfs_atime_nsec);
+        __COPY_ATTR2(st_mtim.tv_nsec, nfs_mtime_nsec);
+        __COPY_ATTR2(st_ctim.tv_nsec, nfs_ctime_nsec);
+#else
+        /* Apple? */
+#endif
+
+err:
+        return ret;
+
+}
+
+int virtfs_stat(virtfs_t *fs, const char *path, struct stat *buf)
+{
+        return _do_nfs_stat(fs, path, buf, nfs_stat64);
+}
+
+int virtfs_lstat(virtfs_t *fs, const char *path, struct stat *buf)
+{
+        return _do_nfs_stat(fs, path, buf, nfs_lstat64);
+}
+
+void virtfs_dump_info(virtfs_t *fs, int verbose)
+{
+        struct virtfs_p *fsp;
+        int ret = -EINVAL;
+
+        fsp = (struct virtfs_p *)fs;
+        DEBUG("fs: %p, ", fsp);
+        if (fs == NULL)
+                goto err;
+
+        DEBUG("flags: %x, server: %s, path: %s, file: %s\n", fsp->flags,
+              fsp->url->server, fsp->url->path, fsp->url->file);
+
+err:
+        return;
 }

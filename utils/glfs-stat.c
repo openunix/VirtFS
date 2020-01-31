@@ -18,21 +18,23 @@
  *
  */
 
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
 
 #include "glfs-stat.h"
-#include "glfs-util.h"
 #include "glfs-stat-util.h"
 
 #include <errno.h>
 #include <error.h>
 #include <getopt.h>
-#include <glusterfs/api/glfs.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#include <virtfs.h>
 
 #define AUTHORS "Written by Craig Cabrey."
 
@@ -52,7 +54,7 @@ static struct option const long_options[] =
         {"dereference", no_argument, NULL, 'L'},
         {"help", no_argument, NULL, 'x'},
         {"port", no_argument, NULL, 'p'},
-        {"version", no_argument, NULL, 'v'},
+        {"version", no_argument, NULL, 'V'},
         {"xlator-option", required_argument, NULL, 'o'},
         {NULL, no_argument, NULL, 0}
 };
@@ -63,34 +65,28 @@ usage ()
         printf ("Usage: %s [OPTION]... URL\n"
                 "Display file status from a remote Gluster volume.\n\n"
                 "  -L, --dereference            follow links\n"
-                "  -o, --xlator-option=OPTION   specify a translator option for the\n"
-                "                               connection. Multiple options are supported\n"
-                "                               and take the form xlator.key=value.\n"
-                "  -p, --port=PORT              specify the port on which to connect\n"
-                "      --help     display this help and exit\n"
-                "      --version  output version information and exit\n\n"
+                "  -h, --help     display this help and exit\n"
+                "  -V, --version  output version information and exit\n\n"
                 "Examples:\n"
-                "  gfstat glfs://host/volume/path/to/file\n"
-                "         Stat the file /path/to/file on the Gluster volume\n"
-                "         of groot on host localhost to standard output.\n"
-                "  gfcli (localhost/groot)> stat /file\n"
+                "  virtfs-stat virtfs://URL/path/to/file\n"
+                "         Stat the file /path/to/file on the VirtFS URL\n"
+                "  virtfs-cli (localhost/groot)> stat /file\n"
                 "         In the context of a shell with a connection established,\n"
-                "         stat a file on the root of the Gluster volume groot\n"
-                "         on localhost.\n",
+                "         stat a file on the root of the VirtFS URL\n",
                 program_invocation_name);
 }
 
 static int
 parse_options (int argc, char *argv[], bool has_connection)
 {
-        uint16_t port = GLUSTER_DEFAULT_PORT;
+//        uint16_t port = GLUSTER_DEFAULT_PORT;
         int ret = -1;
         int opt = 0;
         int option_index = 0;
-        struct xlator_option *option;
+//        struct xlator_option *option;
 
         while (true) {
-                opt = getopt_long (argc, argv, "Lo:p:", long_options,
+                opt = getopt_long (argc, argv, "dLVx", long_options,
                                 &option_index);
 
                 if (opt == -1) {
@@ -104,6 +100,7 @@ parse_options (int argc, char *argv[], bool has_connection)
                         case 'L':
                                 state->dereference = true;
                                 break;
+#if 0
                         case 'o':
                                 option = parse_xlator_option (optarg);
                                 if (option == NULL) {
@@ -124,14 +121,9 @@ parse_options (int argc, char *argv[], bool has_connection)
                                 }
 
                                 break;
-                        case 'v':
-                                printf ("%s (%s) %s\n%s\n%s\n%s\n",
-                                        program_invocation_name,
-                                        PACKAGE_NAME,
-                                        PACKAGE_VERSION,
-                                        COPYRIGHT,
-                                        LICENSE,
-                                        AUTHORS);
+#endif
+                        case 'V':
+                                PRINT_VERSION;
                                 ret = -2;
                                 goto out;
                         case 'x':
@@ -152,7 +144,7 @@ parse_options (int argc, char *argv[], bool has_connection)
                         error (0, errno, "strdup");
                         goto out;
                 }
-
+#if 0
                 if (has_connection) {
                         state->gluster_url = gluster_url_init ();
                         if (state->gluster_url == NULL) {
@@ -177,6 +169,8 @@ parse_options (int argc, char *argv[], bool has_connection)
                 }
 
                 state->gluster_url->port = port;
+#endif
+                ret = 0;
         }
 
         goto out;
@@ -243,23 +237,23 @@ print_stat (char *path, struct stat stat)
 }
 
 static int
-stat_with_fs (glfs_t *fs)
+stat_with_fs(virtfs_t *fs, const char *path)
 {
         int ret;
         struct stat statbuf;
 
         if (state->dereference) {
-                ret = glfs_stat (fs, state->gluster_url->path, &statbuf);
+                ret = virtfs_stat (fs, path, &statbuf);
         } else {
-                ret = glfs_lstat (fs, state->gluster_url->path, &statbuf);
+                ret = virtfs_lstat (fs, path, &statbuf);
         }
 
-        if (ret == -1) {
-                error (0, errno, "cannot stat `%s'", state->url);
+        if (ret < 0) {
+                error (0, -ret, "cannot stat `%s'", state->url);
                 goto out;
         }
 
-        print_stat (state->gluster_url->path, statbuf);
+        print_stat (path, statbuf);
 
 out:
         return ret;
@@ -268,15 +262,21 @@ out:
 static int
 stat_without_context ()
 {
-        glfs_t *fs = NULL;
+        virtfs_t *fs = NULL;
         int ret;
 
-        ret = gluster_getfs (&fs, state->gluster_url);
+        ret = virtfs_new(state->url, &fs);
+        if (ret) {
+                usage();
+                goto out;
+        }
+
+        ret = virtfs_init(fs);
         if (ret == -1) {
                 error (0, errno, "failed to connect to `%s'", state->url);
                 goto out;
         }
-
+#if 0
         ret = apply_xlator_options (fs, &state->xlator_options);
         if (ret == -1) {
                 error (0, errno, "failed to apply translator options");
@@ -291,12 +291,17 @@ stat_without_context ()
                         goto out;
                 }
         }
+#endif
+        if (state->debug){
+                printf("FS initialized correctly:\n");
+                virtfs_dump_info(fs, 0);
+        }
 
-        ret = stat_with_fs (fs);
+        ret = stat_with_fs (fs, NULL);
 
 out:
         if (fs) {
-                glfs_fini (fs);
+                virtfs_fini (fs);
         }
 
         return ret;
@@ -323,8 +328,13 @@ do_stat (struct cli_context *ctx)
                         goto out;
                 }
 
-                ret = stat_with_fs (ctx->fs);
+                ret = stat_with_fs(ctx->fs, state->url);
         } else {
+                if (ctx->in_shell) {
+                        error(0, 0, "Use connect first before stat");
+                        goto out;
+                }
+
                 ret = parse_options (argc, argv, false);
                 switch (ret) {
                         case -2:
@@ -334,12 +344,12 @@ do_stat (struct cli_context *ctx)
                                 goto out;
                 }
 
-                ret = stat_without_context ();
+                ret = stat_without_context();
         }
 
 out:
         if (state) {
-                gluster_url_free (state->gluster_url);
+//                gluster_url_free (state->gluster_url);
                 free (state->url);
         }
 

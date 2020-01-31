@@ -49,8 +49,11 @@ int virtfs_new(const char *spec, virtfs_t **vfs) __THROW;
 int virtfs_init(virtfs_t *vfs) __THROW;
 int virtfs_add_option(virtfs_t *vfs, const char *opt) __THROW;
 int virtfs_fini(virtfs_t *vfs) __THROW;
-int virtfs_dump_info(virtfs_t *vfs) __THROW;
+void virtfs_dump_info(virtfs_t *vfs, int verbose) __THROW;
 void virtfs_clean() __THROW;
+
+int virtfs_stat(virtfs_t *fs, const char *path, struct stat *buf) __THROW;
+int virtfs_lstat(virtfs_t *fs, const char *path, struct stat *buf) __THROW;
 
 typedef void *virtfs_fd_t;
 #define vfd_t virtfs_fd_t

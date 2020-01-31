@@ -19,7 +19,9 @@
  *
  */
 
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
 
 #include <ctype.h>
 #include <errno.h>
@@ -103,7 +105,9 @@ static struct cmd const cmds[] =
         { .name = "quit", .execute = handle_quit },
 #if 0
         { .alias = "gfrm", .name = "rm", .execute = do_rm },
-        { .alias = "gfstat", .name = "stat", .execute = do_stat },
+#endif
+        { .alias = "virtfs-stat", .name = "stat", .execute = do_stat },
+#if 0
         { .alias = "gftail", .name = "tail", .execute = do_tail },
         { .name = "flock", .execute = do_flock },
         { .alias = "gftruncate", .name = "truncate", .execute = do_truncate },
@@ -310,16 +314,8 @@ parse_options (struct cli_context *ctx)
                                 usage ();
                                 exit (EXIT_SUCCESS);
                         case 'V':
-                                printf ("%s (%s) %s\n\n%s\n%s\n  %s\n",
-                                                program_invocation_name,
-                                                PACKAGE_NAME,
-                                                PACKAGE_VERSION,
-                                                COPYRIGHT,
-                                                LICENSE,
-                                                AUTHORS);
+                                PRINT_VERSION;
                                 exit (EXIT_SUCCESS);
-                        case '?':
-                                break;
                         default:
                                 error (EXIT_FAILURE, 0, "Try --help for more information.");
                 }
@@ -438,7 +434,7 @@ main (int argc, char *argv[])
                 ret = start_shell ();
 
                 if (ctx->options->debug) {
-                        //print_xlator_options (&ctx->options->xlator_options);
+                        virtfs_dump_info(ctx->fs, 0);
                 }
         }
 
