@@ -25,4 +25,6 @@ void virtfs_set_log_func(virtfs_log_func_t func);
 
 void virtfs_log(enum virtfs_log_level level, const char *fmt, ...);
 
+int virtfs_set_log_level(virtfs_t fs, enum virtfs_log_level level);
+
 #endif /*_VIRTFS_LOG_H_*/

@@ -237,7 +237,7 @@ print_stat (char *path, struct stat stat)
 }
 
 static int
-stat_with_fs(virtfs_t *fs, const char *path)
+stat_with_fs(virtfs_t fs, const char *path)
 {
         int ret;
         struct stat statbuf;
@@ -262,7 +262,7 @@ out:
 static int
 stat_without_context ()
 {
-        virtfs_t *fs = NULL;
+        virtfs_t fs = NULL;
         int ret;
 
         ret = virtfs_new(state->url, &fs);

@@ -3,10 +3,10 @@ LDADD = $(top_builddir)/lib/libutils.a $(top_builddir)/lib/libvirtfs.a
 
 all-local:
 	$(LN_S) -f virtfs-cli virtfs-stat
+	$(LN_S) -f virtfs-cli virtfs-ls
 	mkdir -p $(top_builddir)/build/bin
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfcat
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfcp
-	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfls
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfmkdir
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gftouch
 	$(LN_S) -f gfcli $(top_builddir)/build/bin/gfrm
@@ -20,7 +20,7 @@ bin_PROGRAMS = virtfs-cli
 #		$(top_builddir)/build/bin/gfput
 
 virtfs_cli_SOURCES = glfs-cli.c glfs-cli-commands.c glfs-stat.c \
-        glfs-stat-util.c\
+        glfs-stat-util.c glfs-ls.c \
          glfs-cat.h \
 	     glfs-cp.h \
 	     glfs-cli-commands.h \

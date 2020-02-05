@@ -17,15 +17,15 @@
  *      along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
 
 #include <errno.h>
 #include <error.h>
 #include <fnmatch.h>
 #include <inttypes.h>
 #include <getopt.h>
-#include <glusterfs/api/glfs.h>
 #include <grp.h>
 #include <libgen.h>
 #include <pwd.h>
@@ -37,8 +37,10 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#include <virtfs.h>
+#include <virtfs_log.h>
+
 #include "glfs-ls.h"
-#include "glfs-util.h"
 #include "glfs-stat-util.h"
 #include "human.h"
 
@@ -55,7 +57,7 @@
  * long_form: Whether to enable long form listing (similar to GNU ls).
  */
 struct state {
-        struct gluster_url *gluster_url;
+        virtfs_t fs;
         char *url;
         bool debug;
         bool human_readable;
@@ -119,7 +121,7 @@ usage ()
 static int
 parse_options (int argc, char *argv[], bool has_connection)
 {
-        uint16_t port = 0;
+        // uint16_t port = 0;
         int ret = -1;
         int opt = 0;
         int option_index = 0;
@@ -127,7 +129,7 @@ parse_options (int argc, char *argv[], bool has_connection)
         // Reset getopt since other utilities may have called it already.
         optind = 0;
         while (true) {
-                opt = getopt_long (argc, argv, "abcdhlp:R", long_options,
+                opt = getopt_long (argc, argv, "abcdhlVR", long_options,
                                 &option_index);
 
                 if (opt == -1) {
@@ -153,6 +155,7 @@ parse_options (int argc, char *argv[], bool has_connection)
                         case 'l':
                                 state->long_form = true;
                                 break;
+#if 0
                         case 'p':
                                 port = strtoport (optarg);
                                 if (port == 0) {
@@ -160,17 +163,12 @@ parse_options (int argc, char *argv[], bool has_connection)
                                 }
 
                                 break;
+#endif
                         case 'R':
                                 state->recursive = true;
                                 break;
-                        case 'v':
-                                printf ("%s (%s) %s\n%s\n%s\n%s\n",
-                                        program_invocation_name,
-                                        PACKAGE_NAME,
-                                        PACKAGE_VERSION,
-                                        COPYRIGHT,
-                                        LICENSE,
-                                        AUTHORS);
+                        case 'V':
+                                PRINT_VERSION;
                                 ret = -2;
                                 goto out;
                         case 'x':
@@ -204,13 +202,14 @@ parse_options (int argc, char *argv[], bool has_connection)
                         goto out;
                 }
 
-                ret = gluster_parse_url (argv[argc - 1], &(state->gluster_url));
-                if (ret == -1) {
-                        error (0, EINVAL, "%s", state->url);
+                ret = virtfs_new(argv[argc - 1], &(state->fs));
+                if (ret < 0) {
+                        error (0, -ret, "%s", state->url);
+                        ret = -1;
                         goto err;
                 }
 
-                state->gluster_url->port = port;
+                // state->gluster_url->port = port;
                 goto out;
         }
 
@@ -234,7 +233,7 @@ init_state ()
 
         state->debug = false;
         state->human_readable = false;
-        state->gluster_url = NULL;
+        state->fs = NULL;
         state->long_form = false;
         state->recursive = false;
         state->show_all = false;
@@ -325,24 +324,24 @@ print_short (const char *ent_name, struct stat *statbuf)
  * and print helper function.
  */
 int
-ls_dir (glfs_t *fs, char *path, char *pattern, void (*print_func)(const char *, struct stat *))
+ls_dir (virtfs_t fs, char *path, char *pattern, void (*print_func)(const char *, struct stat *))
 {
         int ret = -1;
-        glfs_fd_t *fd = NULL;
+        vdir_t fd = NULL;
         struct stat stat;
         struct stat statbuf;
         struct dirent *dirent;
         char *full_path;
 
-        ret = glfs_lstat (fs, path, &stat);
-        if (ret == -1) {
-                error (0, errno, "%s", path);
+        ret = virtfs_lstat (fs, path, &stat);
+        if (ret < 0) {
+                error (0, -ret, "%s", path);
                 goto out;
         }
 
-        fd = glfs_opendir (fs, path);
-        if (fd == NULL) {
-                error (0, errno, "%s", path);
+        ret = virtfs_opendir(fs, path, &fd);
+        if (ret < 0) {
+                error (0, -ret, "%s", path);
                 goto out;
         }
 
@@ -353,13 +352,13 @@ ls_dir (glfs_t *fs, char *path, char *pattern, void (*print_func)(const char *, 
         if (state->show_all) {
                 print_func (".", &stat);
 
-                full_path = append_path (path, "..");
-                glfs_lstat (fs, full_path, &statbuf);
+                full_path = virtfs_append_path (path, "..");
+                virtfs_lstat (fs, full_path, &statbuf);
                 print_func ("..", &statbuf);
                 free (full_path);
         }
 
-        while ((dirent = glfs_readdirplus (fd, &stat)) != NULL) {
+        while ((dirent = virtfs_readdirplus (fd, &stat)) != NULL) {
                 if (pattern && fnmatch (pattern, dirent->d_name, 0) != 0) {
                         continue;
                 }
@@ -372,8 +371,8 @@ ls_dir (glfs_t *fs, char *path, char *pattern, void (*print_func)(const char *, 
                         continue;
                 }
 
-                full_path = append_path (path, dirent->d_name);
-                if (glfs_lstat (fs, full_path, &statbuf) == -1) {
+                full_path = virtfs_append_path (path, dirent->d_name);
+                if (virtfs_lstat (fs, full_path, &statbuf) < 0) {
                         error (0, errno, "failed to stat %s", path);
                 } else {
                         print_func (dirent->d_name, &statbuf);
@@ -390,14 +389,14 @@ ls_dir (glfs_t *fs, char *path, char *pattern, void (*print_func)(const char *, 
          * In order to recurse, we need to loop over the directory entries
          * again. To do so, close and re-open the directory to force a rewind.
          */
-        ret = glfs_closedir (fd);
-        fd = glfs_opendir (fs, path);
-        if (fd == NULL) {
-                error (0, errno, "failed to open %s", path);
+        ret = virtfs_closedir (fd);
+        ret = virtfs_opendir (fs, path, &fd);
+        if (ret < 0) {
+                error (0, -ret, "failed to open %s", path);
                 goto out;
         }
 
-        while ((dirent = glfs_readdirplus (fd, &stat)) != NULL) {
+        while ((dirent = virtfs_readdirplus (fd, &stat)) != NULL) {
                 if (pattern && fnmatch (pattern, dirent->d_name, 0) != 0) {
                         continue;
                 }
@@ -411,7 +410,7 @@ ls_dir (glfs_t *fs, char *path, char *pattern, void (*print_func)(const char *, 
                 }
 
                 if (dirent->d_type == DT_DIR) {
-                        full_path = append_path (path, dirent->d_name);
+                        full_path = virtfs_append_path (path, dirent->d_name);
                         if (full_path == NULL) {
                                 goto out;
                         }
@@ -429,14 +428,14 @@ ls_dir (glfs_t *fs, char *path, char *pattern, void (*print_func)(const char *, 
 
 out:
         if (fd) {
-                ret = glfs_closedir (fd);
+                ret = virtfs_closedir (fd);
         }
 
         return ret;
 }
 
 static int
-ls (glfs_t *fs, char *path)
+ls (virtfs_t fs, char *path)
 {
         char *pattern = NULL;
         char *real_path = NULL;
@@ -465,7 +464,7 @@ ls (glfs_t *fs, char *path)
 
         pattern = basename (path);
         if (pattern && strchr (pattern, '*') == NULL) {
-                if (glfs_stat (fs, path, &statbuf)) {
+                if (virtfs_stat (fs, path, &statbuf)) {
                         error (0, errno, "failed to access %s", state->url);
                         goto out;
                 }
@@ -494,29 +493,37 @@ out:
 static int
 ls_without_context ()
 {
-        glfs_t *fs = NULL;
+        virtfs_t fs = NULL;
+        char *path;
         int ret;
 
-        ret = gluster_getfs (&fs, state->gluster_url);
-        if (ret == -1) {
-                error (0, errno, "failed to access %s", state->url);
+        ret = virtfs_init(state->fs);
+        if (ret < 0) {
+                error (0, -ret, "failed to access %s", state->url);
                 goto out;
         }
+        fs = state->fs;
 
         if (state->debug) {
-                ret = glfs_set_logging (fs, "/dev/stderr", GF_LOG_DEBUG);
+                ret = virtfs_set_log_level(fs, VIRTFS_LOG_DEBUG);
 
-                if (ret == -1) {
+                if (ret < 0) {
                         error (0, errno, "failed to set logging level");
                         goto out;
                 }
         }
 
-        ret = ls (fs, state->gluster_url->path);
+        path = virtfs_url_get_path(fs);
+        if (!path) {
+                ret = -1;
+                goto out;
+        }
+        ret = ls(fs, path);
+        free(path);
 
 out:
         if (fs) {
-                glfs_fini (fs);
+                virtfs_fini(fs);
         }
 
         return ret;
@@ -560,7 +567,6 @@ do_ls (struct cli_context *ctx)
 
 out:
         if (state) {
-                gluster_url_free (state->gluster_url);
                 free (state->url);
         }
 

@@ -44,7 +44,7 @@ cli_connect (struct cli_context *ctx)
         int opt;
         int option_index;
         char *url = NULL;
-        virtfs_t *fs = NULL;
+        virtfs_t fs = NULL;
         struct xlator_option *xlator_options = NULL;
         struct xlator_option *option;
 

@@ -24,12 +24,12 @@
 
 struct fd_list {
         struct fd_list *next;
-        virtfs_fd_t *fd;
+        virtfs_fd_t fd;
         char *path;
 };
 
 struct cli_context {
-        virtfs_t *fs;
+        virtfs_t fs;
         struct fd_list *flist;
         char *url;
         struct options *options;

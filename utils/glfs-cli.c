@@ -97,8 +97,8 @@ static struct cmd const cmds[] =
         { .alias = "gfcp", .name = "cp", .execute = do_cp },
 #endif
         { .name = "help", .execute = shell_usage },
+        { .alias = "virtfs-ls", .name = "ls", .execute = do_ls },
 #if 0
-        { .alias = "gfls", .name = "ls", .execute = do_ls },
         { .alias = "gfmkdir", .name = "mkdir", .execute = do_mkdir },
         { .alias = "gftouch", .name = "touch", .execute = do_touch },
 #endif
